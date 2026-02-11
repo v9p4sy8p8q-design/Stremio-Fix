@@ -12,21 +12,21 @@ echo "Detected architecture: $ARCH"
 # Version selection
 echo ""
 echo "Select Stremio version:"
-echo "  [1] Stremio v5.1.12 (Latest)"
+echo "  [1] Stremio v5.1.14 (Latest)"
 echo "  [2] Stremio v4.4.171 (Legacy)"
 echo ""
 read -p "Enter your choice (1 or 2): " VERSION_CHOICE
 
 case $VERSION_CHOICE in
     1)
-        STREMIO_VERSION="5.1.12"
-        echo "Selected: Stremio v5.1.12"
+        STREMIO_VERSION="5.1.14"
+        echo "Selected: Stremio v5.1.14"
         if [[ "$ARCH" == "arm64" ]]; then
-            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.12/Stremio_arm64.dmg"
-            MOUNT_POINT="/Volumes/Stremio v5.1.12 arm64"
+            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.14/Stremio_arm64.dmg"
+            MOUNT_POINT="/Volumes/Stremio v5.1.14 arm64"
         elif [[ "$ARCH" == "x86_64" ]]; then
-            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.12/Stremio_x64.dmg"
-            MOUNT_POINT="/Volumes/Stremio v5.1.12 x64"
+            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.14/Stremio_x64.dmg"
+            MOUNT_POINT="/Volumes/Stremio v5.1.14 x64"
         else
             echo "Error: Unsupported architecture: $ARCH"
             exit 1
