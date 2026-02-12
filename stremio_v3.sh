@@ -1,32 +1,55 @@
 #!/bin/bash
 
 # Script to download, install, and re-sign Stremio for macOS
-# This helps bypass macOS Gatekeeper restrictions
+# Supports macOS High Sierra (10.13) and above
 
 echo "=== Stremio Installation Script for macOS ==="
 
+# Check macOS version
+OS_VERSION=$(sw_vers -productVersion)
+OS_MAJOR=$(echo "$OS_VERSION" | cut -d. -f1)
+OS_MINOR=$(echo "$OS_VERSION" | cut -d. -f2)
+
+if [[ "$OS_MAJOR" -lt 10 ]] || [[ "$OS_MAJOR" -eq 10 && "$OS_MINOR" -lt 13 ]]; then
+    echo "Error: macOS High Sierra (10.13) or later is required."
+    exit 1
+fi
+
 # Detect architecture
 ARCH=$(uname -m)
-echo "Detected architecture: $ARCH"
+
+# Display system information in dashed boxes
+echo ""
+echo "------------------------------------"
+echo "  macOS Version: $OS_VERSION"
+echo "  Architecture:  $ARCH"
+echo "------------------------------------"
+echo ""
 
 # Version selection
-echo ""
 echo "Select Stremio version:"
-echo "  [1] Stremio v5.1.12 (Latest)"
+echo "  [1] Stremio v5.1.14 (Latest)"
 echo "  [2] Stremio v4.4.171 (Legacy)"
 echo ""
-read -p "Enter your choice (1 or 2): " VERSION_CHOICE
+
+# Add recommendation for ARM users
+if [[ "$ARCH" == "arm64" ]]; then
+    echo "⚠️  Recommendation: Option [1] is recommended for Apple Silicon Macs"
+    echo ""
+fi
+
+read -p "Enter your choice (1 or 2): " VERSION_CHOICE </dev/tty
 
 case $VERSION_CHOICE in
     1)
-        STREMIO_VERSION="5.1.12"
-        echo "Selected: Stremio v5.1.12"
+        STREMIO_VERSION="5.1.14"
+        echo "Selected: Stremio v5.1.14"
         if [[ "$ARCH" == "arm64" ]]; then
-            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.12/Stremio_arm64.dmg"
-            MOUNT_POINT="/Volumes/Stremio v5.1.12 arm64"
+            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.14/Stremio_arm64.dmg"
+            MOUNT_POINT="/Volumes/Stremiov5arm"
         elif [[ "$ARCH" == "x86_64" ]]; then
-            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.12/Stremio_x64.dmg"
-            MOUNT_POINT="/Volumes/Stremio v5.1.12 x64"
+            STREMIO_URL="https://dl.strem.io/stremio-shell-macos/v5.1.14/Stremio_x64.dmg"
+            MOUNT_POINT="/Volumes/Stremiov5x86"
         else
             echo "Error: Unsupported architecture: $ARCH"
             exit 1
@@ -36,7 +59,7 @@ case $VERSION_CHOICE in
         STREMIO_VERSION="4.4.171"
         echo "Selected: Stremio v4.4.171"
         STREMIO_URL="https://dl.strem.io/shell-osx/v4.4.171/Stremio+4.4.171.dmg"
-        MOUNT_POINT="/Volumes/Stremio 4.4.171"
+        MOUNT_POINT="/Volumes/Stremio4"
         ;;
     *)
         echo "Error: Invalid choice."
@@ -54,11 +77,11 @@ echo "Downloading Stremio v${STREMIO_VERSION}..."
 curl -L -o "$DMG_FILE" "$STREMIO_URL"
 
 # Strip quarantine from DMG immediately after download
+# Using individual -d calls for compatibility with High Sierra's xattr
 echo "Stripping quarantine attributes from DMG..."
 xattr -d com.apple.quarantine "$DMG_FILE" 2>/dev/null || true
 xattr -d com.apple.metadata:kMDItemWhereFroms "$DMG_FILE" 2>/dev/null || true
 xattr -d com.apple.metadata:kMDItemDownloadedDate "$DMG_FILE" 2>/dev/null || true
-xattr -r -d com.apple.quarantine "$DMG_FILE" 2>/dev/null || true
 echo "DMG quarantine attributes removed"
 
 # Mount the DMG
@@ -109,19 +132,22 @@ echo "Removing DMG file..."
 rm "$DMG_FILE"
 
 # Strip all extended attributes from the app bundle
+# Using find + xattr loop for broader compatibility instead of xattr -r
 echo "Stripping all extended attributes from app bundle..."
- xattr -c -r "$APPLICATIONS/$APP_NAME" 2>/dev/null || true
- xattr -d -r com.apple.quarantine "$APPLICATIONS/$APP_NAME" 2>/dev/null || true
- xattr -d -r com.apple.metadata:kMDItemWhereFroms "$APPLICATIONS/$APP_NAME" 2>/dev/null || true
- xattr -d -r com.apple.metadata:kMDItemDownloadedDate "$APPLICATIONS/$APP_NAME" 2>/dev/null || true
+find "$APPLICATIONS/$APP_NAME" -print0 | xargs -0 xattr -c 2>/dev/null || true
+find "$APPLICATIONS/$APP_NAME" -print0 | xargs -0 xattr -d com.apple.quarantine 2>/dev/null || true
+find "$APPLICATIONS/$APP_NAME" -print0 | xargs -0 xattr -d com.apple.metadata:kMDItemWhereFroms 2>/dev/null || true
+find "$APPLICATIONS/$APP_NAME" -print0 | xargs -0 xattr -d com.apple.metadata:kMDItemDownloadedDate 2>/dev/null || true
 echo "Extended attributes removed"
 
 # Remove existing signature
+# --remove-signature was added in macOS 10.12 so safe for High Sierra+
 echo "Removing original code signature..."
-codesign --remove-signature "$APPLICATIONS/$APP_NAME" 2>&1
+codesign --remove-signature "$APPLICATIONS/$APP_NAME" 2>&1 || true
 echo "Original signature removed"
 
-# Re-sign the app
+# Re-sign with ad-hoc signature
+# -f/--force and --deep are supported on High Sierra+
 echo "Applying new ad-hoc signature..."
 codesign --force --deep --sign - "$APPLICATIONS/$APP_NAME" 2>&1
 echo "Signing complete"
